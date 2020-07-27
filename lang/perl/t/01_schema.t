@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 use Test::More;
-plan tests => 130;
+plan tests => 169;
 use Test::Exception;
 use_ok 'Avro::Schema';
 
@@ -87,27 +87,8 @@ is $s, $s2, "string Schematas are singletons";
         'regenerated structure matches original';
 
     ## record fields can have defaults
-    my @good_ints = (2, -1, -(2**31 - 1), 2_147_483_647, "2147483647"  );
-    my @bad_ints = ("", "string", 9.22337204, 9.22337204E10, \"2");
-    my @good_longs = (1, 2, -3);
-    my @bad_longs = (9.22337204, 9.22337204E10 + 0.1, \"2");
-
-    use Config;
-    if ($Config{use64bitint}) {
-        push @bad_ints, (2**32 - 1, 4_294_967_296, 9_223_372_036_854_775_807);
-        push @good_longs, (9_223_372_036_854_775_807, 3e10);
-        push @bad_longs, 9_223_372_036_854_775_808;
-    }
-    else {
-        require Math::BigInt;
-        push @bad_ints, map { Math::BigInt->new($_) }
-            ("0xFFFF_FFFF", "0x1_0000_0000", "0x7FFF_FFFF_FFFF_FFFF");
-        push @good_longs, map { Math::BigInt->new($_) }
-            ("9_223_372_036_854_775_807", "3e10");
-        push @bad_longs, Math::BigInt->new("9_223_372_036_854_775_808");
-    }
-
-    for (@good_ints) {
+    my %good_bad = good_bad();
+    for (@{ $good_bad{good_ints} }) {
         my $s4 = Avro::Schema::Record->new(
             struct => { name => 'saucisson',
                 fields => [
@@ -117,7 +98,7 @@ is $s, $s2, "string Schematas are singletons";
         );
         is $s4->fields->[0]{default}, $_, "default $_";
     }
-    for (@good_longs) {
+    for (@{ $good_bad{good_longs} }) {
         my $s4 = Avro::Schema::Record->new(
             struct => { name => 'saucisson',
                 fields => [
@@ -127,7 +108,7 @@ is $s, $s2, "string Schematas are singletons";
         );
         is $s4->fields->[0]{default}, $_, "default $_";
     }
-    for (@bad_ints) {
+    for (@{ $good_bad{bad_ints} }) {
         throws_ok  { Avro::Schema::Record->new(
             struct => { name => 'saucisson',
                 fields => [
@@ -136,7 +117,7 @@ is $s, $s2, "string Schematas are singletons";
             },
         ) } "Avro::Schema::Error::Parse", "invalid default: $_";
     }
-    for (@bad_longs) {
+    for (@{ $good_bad{bad_longs} }) {
         throws_ok  { Avro::Schema::Record->new(
             struct => { name => 'saucisson',
                 fields => [
@@ -457,6 +438,26 @@ EOJ
     isa_ok $s->fields->[0]{type}, 'Avro::Schema::Union';
 }
 
+## is_data_valid
+{
+    my %good_bad = good_bad();
+    for my $type (qw< null boolean int long >) {
+        my $s = Avro::Schema->parse(qq("$type"));
+        for my $v (@{ $good_bad{ "good_${type}s" } }) {
+            ok $s->is_data_valid($v), "is_data_valid good $type";
+        }
+        for my $v (@{ $good_bad{ "bad_${type}s" } }) {
+            TODO: {
+                local $TODO = '<undef> and strings containing valid strings ' .
+                              'are not properly handled'
+                              if !defined $v
+                              || $v eq 'foo';
+                ok !$s->is_data_valid($v), "is_data_valid bad $type";
+            }
+        }
+    }
+}
+
 sub match_ok {
     my ($w, $r, $msg) = @_;
     $msg ||= "match_ok";
@@ -467,6 +468,39 @@ sub match_nok {
     my ($w, $r, $msg) = @_;
     $msg ||= "non matching";
     ok !Avro::Schema->match(reader => $r, writer => $w), $msg;
+}
+
+sub good_bad {
+    my @good_ints = (2, -1, -(2**31 - 1), 2_147_483_647, "2147483647"  );
+    my @bad_ints = ("", "string", 9.22337204, 9.22337204E10, \"2");
+    my @good_longs = (1, 2, -3);
+    my @bad_longs = (9.22337204, 9.22337204E10 + 0.1, \"2");
+
+    use Config;
+    if ($Config{use64bitint}) {
+        push @bad_ints, (2**32 - 1, 4_294_967_296, 9_223_372_036_854_775_807);
+        push @good_longs, (9_223_372_036_854_775_807, 3e10);
+        push @bad_longs, 9_223_372_036_854_775_808;
+    }
+    else {
+        require Math::BigInt;
+        push @bad_ints, map { Math::BigInt->new($_) }
+            ("0xFFFF_FFFF", "0x1_0000_0000", "0x7FFF_FFFF_FFFF_FFFF");
+        push @good_longs, map { Math::BigInt->new($_) }
+            ("9_223_372_036_854_775_807", "3e10");
+        push @bad_longs, Math::BigInt->new("9_223_372_036_854_775_808");
+    }
+
+    return (
+        good_nulls    => [undef],
+        bad_nulls     => [0, 1, '', 'false', \0],
+        good_booleans => [qw<yes no y n t f true false>],
+        bad_booleans  => [undef, qw<foo bar>],
+        good_ints     => \@good_ints,
+        bad_ints      => \@bad_ints,
+        good_longs    => \@good_longs,
+        bad_longs     => \@bad_longs,
+    );
 }
 
 done_testing;
