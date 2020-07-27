@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 use Test::More;
-plan tests => 217;
+plan tests => 265;
 use Test::Exception;
 use_ok 'Avro::Schema';
 
@@ -486,6 +486,10 @@ EOJ
                 logical_type => $logical_type,
             );
             is $p->logical_type, $logical_type, "$type with $logical_type ok";
+            is_deeply $p->to_struct, {
+                type => $type,
+                logicalType => $logical_type
+            }, "to_struct for $type with $logical_type";
         }
     }
 
@@ -497,6 +501,7 @@ EOJ
                 logical_type => $logical_type,
             );
             is $p->logical_type, undef, "$type with $logical_type not ok";
+            is $p->to_struct, $type, "to_struct for $type";
         }
     }
 }

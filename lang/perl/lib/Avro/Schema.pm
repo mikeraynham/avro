@@ -338,7 +338,9 @@ sub is_data_valid {
 
 sub to_struct {
     my $schema = shift;
-    return $schema->type;
+    return $schema->logical_type
+        ? { type => $schema->type, logicalType => $schema->logical_type }
+        : $schema->type;
 }
 
 package Avro::Schema::Named;
