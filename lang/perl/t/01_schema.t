@@ -447,13 +447,7 @@ EOJ
             ok $s->is_data_valid($v), "is_data_valid good $type";
         }
         for my $v (@{ $good_bad{ "bad_${type}s" } }) {
-            TODO: {
-                local $TODO = '<undef> and strings containing valid strings ' .
-                              'are not properly handled'
-                              if !defined $v
-                              || $v eq 'foo';
-                ok !$s->is_data_valid($v), "is_data_valid bad $type";
-            }
+            ok !$s->is_data_valid($v), "is_data_valid bad $type";
         }
     }
 }

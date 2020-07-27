@@ -311,8 +311,8 @@ sub is_data_valid {
         return defined $data ? 0 : 1;
     }
     if ($type eq 'boolean') {
-        return 0 if ref $data; # sometimes risky
-        return 1 if $data =~ m{yes|no|y|n|t|f|true|false}i;
+        return 0 if !defined $data || ref $data; # sometimes risky
+        return 1 if $data =~ m{\A (?:yes|no|y|n|t|f|true|false) \z}xmsi;
         return 0;
     }
     return 0;
