@@ -235,16 +235,16 @@ use Carp;
 use Config;
 use Regexp::Common qw/number/;
 
-my %PrimitiveType = map { $_ => 1 } qw/
-    null
-    boolean
-    int
-    long
-    float
-    double
-    bytes
-    string
-/;
+my %PrimitiveType = map { my ($k, $v) = @$_; $k => { map { $_ => 1 } @$v } } (
+    [ null    => [] ],
+    [ boolean => [] ],
+    [ int     => [qw/ date time-millis /] ],
+    [ long    => [qw/ time-micros timestamp-millis timestamp-micros /] ],
+    [ float   => [] ],
+    [ double  => [] ],
+    [ bytes   => [qw/ decimal /] ],
+    [ string  => [] ],
+);
 
 my %Singleton = ( );
 
@@ -259,11 +259,29 @@ sub new {
     throw Avro::Schema::Error::Parse("Not a primitive type $type")
         unless $class->is_type_valid($type);
 
-    if (! exists $Singleton{ $type } ) {
-        my $schema = $class->SUPER::new( type => $type );
-        $Singleton{ $type } = $schema;
+    my $logical_type = _validate_logical_type($type, $param{logical_type});
+    if (! exists $Singleton{ $type }{ $logical_type } ) {
+        my $schema = $class->SUPER::new(type => $type);
+        $schema->{logical_type} = $logical_type
+            if $logical_type;
+        $Singleton{ $type }{ $logical_type } = $schema;
     }
-    return $Singleton{ $type };
+    return $Singleton{ $type }{ $logical_type };
+}
+
+sub _validate_logical_type {
+    my ($type, $logical_type) = @_;
+
+    return $logical_type
+        if defined $logical_type
+        && $PrimitiveType{ $type }{ $logical_type };
+
+    return '';
+}
+
+sub logical_type {
+    my $schema = shift;
+    return $schema->{logical_type};
 }
 
 sub is_type_valid {

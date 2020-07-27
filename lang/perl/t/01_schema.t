@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 use Test::More;
-plan tests => 169;
+plan tests => 217;
 use Test::Exception;
 use_ok 'Avro::Schema';
 
@@ -448,6 +448,55 @@ EOJ
         }
         for my $v (@{ $good_bad{ "bad_${type}s" } }) {
             ok !$s->is_data_valid($v), "is_data_valid bad $type";
+        }
+    }
+}
+
+## logicalType
+{
+    my @logical_types = qw/
+        date
+        time-millis
+        time-micros
+        timestamp-millis
+        timestamp-micros
+        decimal
+    /;
+    my @good = (
+        [ int   => qw/ date time-millis / ],
+        [ long  => qw/ time-micros timestamp-millis timestamp-micros / ],
+        [ bytes => qw/ decimal / ],
+    );
+    my @bad = (
+        [ null    => @logical_types ],
+        [ boolean => @logical_types ],
+        [ int     => qw/ time-micros timestamp-millis timestamp-micros decimal / ],
+        [ long    => qw/ date time-millis decimal / ],
+        [ float   => @logical_types ],
+        [ double  => @logical_types ],
+        [ bytes   => qw/ date time-millis time-micros timestamp-millis timestamp-micros / ],
+        [ string  => @logical_types ],
+    );
+
+    for my $test (@good) {
+        my ($type, @logical_types) = @$test;
+        for my $logical_type (@logical_types) {
+            my $p = Avro::Schema::Primitive->new(
+                type => $type,
+                logical_type => $logical_type,
+            );
+            is $p->logical_type, $logical_type, "$type with $logical_type ok";
+        }
+    }
+
+    for my $test (@bad) {
+        my ($type, @logical_types) = @$test;
+        for my $logical_type (@logical_types) {
+            my $p = Avro::Schema::Primitive->new(
+                type => $type,
+                logical_type => $logical_type,
+            );
+            is $p->logical_type, undef, "$type with $logical_type not ok";
         }
     }
 }
