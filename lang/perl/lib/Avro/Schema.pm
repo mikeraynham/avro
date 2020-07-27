@@ -61,7 +61,10 @@ sub parse_struct {
         my $type = $struct->{type}
             or throw Avro::Schema::Error::Parse("type is missing");
         if ( Avro::Schema::Primitive->is_type_valid($type) ) {
-            return Avro::Schema::Primitive->new(type => $type);
+            return Avro::Schema::Primitive->new(
+                type => $type,
+                logical_type => $struct->{logicalType},
+            );
         }
         ## XXX technically we shouldn't allow error type other than in
         ## a Protocol definition
